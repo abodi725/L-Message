@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>I Love You Very Much</title>
+<style>
+* { box-sizing: border-box; }
+body {
+margin: 0; min-height: 100vh; padding: 16px;
+display: flex; flex-direction: column;
+align-items: center; justify-content: center;
+background: linear-gradient(135deg, #ff758c, #ff7eb3);
+font-family: system-ui, sans-serif; color: #fff; text-align: center;
+}
+h1 { font-size: 2.2rem; margin: 0 0 20px; }
+.card { width: min(520px, 100%); display: flex; flex-direction: column; gap: 12px; }
+input, select {
+width: 100%; padding: 14px; font-size: 1rem;
+border: 0; border-radius: 12px; color: #333;
+}
+button {
+padding: 14px 24px; font-size: 1.05rem; border: 0;
+border-radius: 30px; background: #fff; color: #e91e63;
+cursor: pointer; font-weight: 600;
+}
+button:hover { transform: scale(1.03); }
+button.secondary { background: rgba(255,255,255,.25); color: #fff; }
+#result {
+min-height: 60px; font-size: 1.6rem; font-weight: 700;
+background: rgba(255,255,255,.2); border-radius: 12px; padding: 14px;
+display: flex; align-items: center; justify-content: center;
+}
+#modal {
+display: none; position: fixed; inset: 0;
+background: rgba(0,0,0,.6); align-items: center; justify-content: center;
+}
+#modal.open { display: flex; }
+.box {
+background: #fff; color: #333; width: min(600px, 92vw);
+max-height: 85vh; border-radius: 16px; overflow: hidden;
+display: flex; flex-direction: column;
+}
+.head {
+display: flex; justify-content: space-between; align-items: center;
+padding: 14px 20px; background: #e91e63; color: #fff; gap: 12px;
+}
+.head span { font-size: 1.1rem; font-weight: 600; text-align: left; }
+.close { background: none; color: #fff; font-size: 1.6rem; padding: 0 8px; }
+#list { overflow-y: auto; padding: 8px 20px 20px; text-align: left; }
+.row {
+display: flex; justify-content: space-between; gap: 12px;
+padding: 10px 0; border-bottom: 1px solid #eee;
+}
+.lang { color: #888; font-size: .9rem; white-space: nowrap; }
+.text { font-weight: 600; text-align: right; }
+</style>
+</head>
+<body>
+<h1>❤️ Translate</h1>
+
+<div class="card">
+<input id="phrase" value="I love you very much" placeholder="Type your sentence...">
+<select id="langSelect"></select>
+<button id="translateBtn">Translate</button>
+<div id="result">—</div>
+<button class="secondary" id="allBtn">Show in all languages</button>
+</div>
+
+<div id="modal">
+<div class="box">
+<div class="head">
+<span id="modalTitle"></span>
+<button class="close" id="closeBtn">×</button>
+</div>
+<div id="list"></div>
+</div>
+</div>
+
+<script>
+const DEFAULT = "I love you very much";
+
+// [name, code, built-in translation of the default sentence]
+const languages = [
+  ["English", "en", "I love you very much"],
+  ["Arabic", "ar", "أحبك كثيراً"],
+  ["Spanish", "es", "Te quiero mucho"],
+  ["French", "fr", "Je t'aime beaucoup"],
+  ["German", "de", "Ich liebe dich sehr"],
+  ["Italian", "it", "Ti amo tanto"],
+  ["Portuguese", "pt", "Eu te amo muito"],
+  ["Russian", "ru", "Я очень тебя люблю"],
+  ["Turkish", "tr", "Seni çok seviyorum"],
+  ["Persian", "fa", "من تو را خیلی دوست دارم"],
+  ["Hebrew", "he", "אני אוהב אותך מאוד"],
+  ["Hindi", "hi", "मैं तुमसे बहुत प्यार करता हूँ"],
+  ["Urdu", "ur", "مجھے تم سے بہت محبت ہے"],
+  ["Bengali", "bn", "আমি তোমাকে অনেক ভালোবাসি"],
+  ["Chinese", "zh-CN", "我非常爱你"],
+  ["Japanese", "ja", "とても愛してる"],
+  ["Korean", "ko", "정말 사랑해요"],
+  ["Thai", "th", "ฉันรักเธอมาก"],
+  ["Vietnamese", "vi", "Anh yêu em rất nhiều"],
+  ["Indonesian", "id", "Aku sangat mencintaimu"],
+  ["Malay", "ms", "Saya sangat sayang awak"],
+  ["Filipino", "tl", "Mahal na mahal kita"],
+  ["Dutch", "nl", "Ik hou heel veel van je"],
+  ["Swedish", "sv", "Jag älskar dig väldigt mycket"],
+  ["Norwegian", "no", "Jeg elsker deg veldig mye"],
+  ["Danish", "da", "Jeg elsker dig meget"],
+  ["Finnish", "fi", "Rakastan sinua kovasti"],
+  ["Polish", "pl", "Bardzo cię kocham"],
+  ["Czech", "cs", "Moc tě miluji"],
+  ["Greek", "el", "Σε αγαπώ πολύ"],
+  ["Hungarian", "hu", "Nagyon szeretlek"],
+  ["Romanian", "ro", "Te iubesc foarte mult"],
+  ["Ukrainian", "uk", "Я дуже тебе кохаю"],
+  ["Swahili", "sw", "Nakupenda sana"],
+  ["Latin", "la", "Te valde amo"]
+];
+
+const phrase = document.getElementById("phrase");
+const select = document.getElementById("langSelect");
+const result = document.getElementById("result");
+const modal = document.getElementById("modal");
+const list = document.getElementById("list");
+
+languages.forEach(([name, code]) => {
+  const o = document.createElement("option");
+  o.value = code;
+  o.textContent = name;
+  select.appendChild(o);
+});
+select.value = "ar";
+
+const isDefault = t => t.trim().toLowerCase() === DEFAULT.toLowerCase();
+
+async function translate(text, code) {
+  const url = "https://api.mymemory.translated.net/get?q=" +
+    encodeURIComponent(text) + "&langpair=Autodetect|" + code;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.responseStatus !== 200) throw new Error(data.responseDetails);
+  return data.responseData.translatedText;
+}
+
+async function getTranslation(text, lang) {
+  if (isDefault(text)) return lang[2];
+  return translate(text, lang[1]);
+}
+
+document.getElementById("translateBtn").onclick = async () => {
+  const text = phrase.value.trim();
+  if (!text) return;
+  const lang = languages.find(l => l[1] === select.value);
+  result.textContent = "...";
+  try {
+    result.textContent = await getTranslation(text, lang);
+  } catch (e) {
+    result.textContent = "Translation failed, try again";
+  }
+};
+
+document.getElementById("allBtn").onclick = () => {
+  const text = phrase.value.trim();
+  if (!text) return;
+  document.getElementById("modalTitle").textContent = text;
+  list.innerHTML = "";
+  modal.classList.add("open");
+  languages.forEach(async lang => {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<span class="lang">${lang[0]}</span><span class="text">...</span>`;
+    list.appendChild(row);
+    try {
+      row.querySelector(".text").textContent = await getTranslation(text, lang);
+    } catch (e) {
+      row.querySelector(".text").textContent = "—";
+    }
+  });
+};
+
+document.getElementById("closeBtn").onclick = () => modal.classList.remove("open");
+modal.onclick = e => {
+  if (e.target === modal) modal.classList.remove("open");
+};
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") modal.classList.remove("open");
+});
+phrase.addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("translateBtn").click();
+});
+</script>
+</body>
+</html>
